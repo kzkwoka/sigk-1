@@ -7,9 +7,8 @@ import torch
 import torch.nn.functional as F
 from skimage import restoration
 from torch.utils.data import DataLoader
-from torchmetrics.image import LearnedPerceptualImagePatchSimilarity as LPIPS
-from torchmetrics.image import PeakSignalNoiseRatio as PSNR
-from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
+from torchmetrics.functional.image import learned_perceptual_image_patch_similarity as lpips, \
+    structural_similarity_index_measure as ssim, peak_signal_noise_ratio as psnr
 from torchvision.transforms import ToTensor
 from tqdm import tqdm
 
@@ -17,45 +16,31 @@ from deblurring.dataset import DeblurringDataset
 from deblurring.model import CNN, AutoEncoder
 
 
-@torch.no_grad()
 def evaluate_model(model: torch.nn.Module, dataloader: DataLoader, device: torch.device) -> dict:
     model.eval()
-    lpips = LPIPS()
-    psnr = PSNR()
-    ssim = SSIM()
 
     scores = {"lpips": [], "psnr": [], "ssim": [], "mse": []}
-    criterion = torch.nn.MSELoss()
+    with torch.no_grad():
+        for masked_images, originals in tqdm(dataloader, desc="Model Evaluation"):
+            masked_images = masked_images.to(device)
+            outputs = model(masked_images).cpu()
+            outputs = torch.clamp(outputs, 0.0, 1.0)
 
-    total_loss = 0.0
+            for i in range(outputs.size(0)):
+                output_img = outputs[i].unsqueeze(0)
+                target_img = originals[i].unsqueeze(0)
 
-    for masked_images, originals in tqdm(dataloader, desc="Model Evaluation"):
-        masked_images = masked_images.to(device)
-        outputs = model(masked_images).cpu()
-
-        loss = criterion(outputs, originals)
-        total_loss += loss.item()
-
-        for i in range(outputs.size(0)):
-            output_img = outputs[i].unsqueeze(0)
-            target_img = originals[i].unsqueeze(0)
-
-            scores["lpips"].append(lpips(output_img, target_img).item())
-            scores["psnr"].append(psnr(output_img, target_img).item())
-            scores["ssim"].append(ssim(output_img, target_img).item())
-            scores["mse"].append(F.mse_loss(output_img, target_img).item())
+                scores["lpips"].append(lpips(output_img, target_img, normalize=True).item())
+                scores["psnr"].append(psnr(output_img, target_img).item())
+                scores["ssim"].append(ssim(output_img, target_img).item())
+                scores["mse"].append(F.mse_loss(output_img, target_img).item())
 
     scores = {k: sum(v) / len(v) for k, v in scores.items()}
-    scores["loss"] = total_loss / len(dataloader)
     return scores
 
 
 @torch.no_grad()
 def evaluate_baseline(dataloader: DataLoader, kernel_size: int, sigma: float, num_iter: int) -> dict:
-    to_tensor = ToTensor()
-    lpips = LPIPS()
-    psnr = PSNR()
-    ssim = SSIM()
 
     scores = {"lpips": [], "psnr": [], "ssim": [], "mse": []}
 
@@ -70,12 +55,13 @@ def evaluate_baseline(dataloader: DataLoader, kernel_size: int, sigma: float, nu
             deconvolved = np.zeros_like(blur_np)
             for c in range(3):
                 deconvolved[..., c] = restoration.richardson_lucy(blur_np[..., c], psf, num_iter=num_iter)
-            deconvolved = np.clip(deconvolved, 0, 1)
 
-            deconvolved_tensor = to_tensor((deconvolved * 255).astype(np.uint8)).unsqueeze(0)
+            deconvolved = np.clip(deconvolved, 0.0, 1.0)
+
+            deconvolved_tensor = torch.from_numpy(deconvolved).permute(2, 0, 1).unsqueeze(0).float()
             sharp_tensor_single = sharp_tensor[i].unsqueeze(0)
 
-            scores["lpips"].append(lpips(deconvolved_tensor, sharp_tensor_single).item())
+            scores["lpips"].append(lpips(deconvolved_tensor, sharp_tensor_single, normalize=True).item())
             scores["psnr"].append(psnr(deconvolved_tensor, sharp_tensor_single).item())
             scores["ssim"].append(ssim(deconvolved_tensor, sharp_tensor_single).item())
             scores["mse"].append(F.mse_loss(deconvolved_tensor, sharp_tensor_single).item())
