@@ -1,25 +1,5 @@
 # Image Modification
 
-## Virtual Environment
-### Create python environment
-```
-conda create -p <ENV_PATH> python=3.11
-```
-
-```
-conda activate <ENV_PATH>
-```
-
-### Install requirements
-```
-pip install -r requirements.txt
-```
-
-### Set PYTHONPATH
-```
-export PYTHONPATH=$(pwd)
-```
-
 ## Debluring experiments
 ### Run example training
 ```
