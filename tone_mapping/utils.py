@@ -49,7 +49,7 @@ def norm_mean(img):
     return img
 
 
-def u_law(img):
+def mu_law(img):
     median_value = np.median(img)
     scale = 8.759 * np.power(median_value, 2.148) + 0.1494 * np.power(median_value, -2.067)
     out = np.log(1 + scale * img) / np.log(1 + scale)

@@ -5,7 +5,7 @@ import numpy as np
 from torch.utils.data import Dataset
 from torchvision.transforms import ToTensor
 
-from utils import norm_mean, u_law, multi_exposure
+from utils import norm_mean, mu_law, multi_exposure
 
 
 class TMDataset(Dataset):
@@ -23,9 +23,9 @@ class TMDataset(Dataset):
         i_src = cv2.imread(image_path, cv2.IMREAD_ANYDEPTH | cv2.IMREAD_ANYCOLOR)
         i_src = np.maximum(cv2.cvtColor(i_src, cv2.COLOR_BGR2RGB), 0.0)
         i_hdr = norm_mean(i_src)
-        i_u = self.tensor(u_law(i_hdr))
+        i_mu = self.tensor(mu_law(i_hdr))
         i_low, i_mid, i_high = multi_exposure(self.tensor(i_hdr))
-        return i_low, i_mid, i_high, i_u
+        return i_low, i_mid, i_high, i_mu
 
 
 if __name__ == '__main__':
