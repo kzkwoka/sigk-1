@@ -1,5 +1,6 @@
 import lightning as L
 import torch
+from lightning.pytorch.utilities.types import OptimizerLRScheduler
 
 from torch import nn, Tensor
 
@@ -45,6 +46,25 @@ class TMNet(L.LightningModule):
         x = self.sigmoid(x)
         return x
 
+    def configure_optimizers(self) -> OptimizerLRScheduler:
+        optimizer = torch.optim.Adam(self.parameters(), lr=2e-4)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "epoch",  # Step every epoch
+                "frequency": 10  # Apply decay every 10 epochs
+            }
+        }
+
+    def training_step(self, batch, batch_idx):
+        x_low, x_mid, x_high, x_mu = batch
+        x = self(x_low, x_mid, x_high)
+        loss = nn.functional.mse_loss(x, x_mu)  #TODO: add feature contrast masking loss (using vgg)
+        self.log('train_loss', loss)
+        return loss
+
 
 if __name__ == '__main__':
     model = TMNet(3)
@@ -54,4 +74,3 @@ if __name__ == '__main__':
     x_high = torch.randn(2, 3, 256, 174)
     out = model(x_low, x_mid, x_high)
     print(out.shape)
-
