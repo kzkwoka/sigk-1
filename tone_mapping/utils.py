@@ -1,6 +1,8 @@
 import os
 
 import cv2
+import numpy as np
+import torch
 from numpy import ndarray
 from brisque import BRISQUE
 
@@ -39,3 +41,31 @@ def tone_map_mantiuk(image: ndarray) -> ndarray:
 def evaluate_image(image: ndarray) -> float:
     metric = BRISQUE(url=False)
     return metric.score(img=image)
+
+
+# image transforms
+def norm_mean(img):
+    img = 0.5 * img / img.mean()
+    return img
+
+
+def u_law(img):
+    median_value = np.median(img)
+    scale = 8.759 * np.power(median_value, 2.148) + 0.1494 * np.power(median_value, -2.067)
+    out = np.log(1 + scale * img) / np.log(1 + scale)
+    return out
+
+
+def multi_exposure(img):
+    x_p = 1.21497
+    log2 = torch.log(torch.tensor(2.0))
+
+    c_start = torch.log(x_p / img.max()) / log2
+    c_end = torch.log(x_p / torch.quantile(img, 0.5)) / log2
+
+    exp_values = torch.tensor([c_start, (c_start + c_end) / 2, c_end])
+
+    sc_factors = torch.pow(torch.sqrt(torch.tensor(2.0)), exp_values).view(-1, 1, 1, 1)
+    img_scaled = img * sc_factors
+
+    return torch.minimum(img_scaled, torch.tensor(1.0))
