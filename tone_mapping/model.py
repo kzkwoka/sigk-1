@@ -63,11 +63,10 @@ class FeatureExtractor(nn.Module):
         x3 = self.vgg31(x2)
         x4 = self.vgg41(x3)
         x5 = self.vgg51(x4)
-        return [x1, x2, x3, x4, x5]
+        return [x1, x2, x3] #, x4, x5] # return only the first 3 layers
 
 
-def FCM_loss(x: Tensor, target: Tensor, gamma=0.5, beta=0.5) -> Tensor:
-    feat_ext = FeatureExtractor().to(x.device)
+def FCM_loss(x: Tensor, target: Tensor, feat_ext: FeatureExtractor, gamma=0.5, beta=0.5) -> Tensor:
     x_feats = feat_ext(x)
     target_feats = feat_ext(target)
     loss = 0
@@ -101,6 +100,7 @@ class TMNet(L.LightningModule):
             nn.Conv2d(in_channels=16, out_channels=3, kernel_size=3, stride=1, padding=1),
         )
         self.sigmoid = nn.Sigmoid()
+        self.feat_ext = FeatureExtractor()
 
     def forward(self, x_low: Tensor, x_mid: Tensor, x_high: Tensor) -> Tensor:
         # encode
@@ -131,8 +131,8 @@ class TMNet(L.LightningModule):
     def training_step(self, batch, batch_idx):
         x_low, x_mid, x_high, x_mu, _ = batch
         x = self(x_low, x_mid, x_high)
-        loss = FCM_loss(x, x_mu, gamma=0.5, beta=0.5)
-        self.log('train_loss', loss)
+        loss = FCM_loss(x, x_mu, self.feat_ext, gamma=0.5, beta=0.5)
+        self.log('train/loss', loss)
         return loss
 
 
