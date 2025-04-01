@@ -14,5 +14,10 @@ python3 tone_mapping/sample_code.py
 
 
 ## Training
-
+```bash
+python3 tone_mapping/train.py
+```
 ## Evaluation
+```bash
+python3 tone_mapping/evaluate.py
+```
