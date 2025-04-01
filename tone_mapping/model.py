@@ -5,6 +5,8 @@ from torch import nn, Tensor
 import torch.nn.functional as F
 from torchvision.models import vgg19
 
+from utils import evaluate_batch
+
 
 def gaussian_kernel_cdf(filter_size: int = 13, sigma: float = 2.0, channels: int = 64) -> torch.Tensor:
     import numpy as np
@@ -122,6 +124,7 @@ class TMNet(L.LightningModule):
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
+                "name": "lr_exp",
                 "scheduler": scheduler,
                 "interval": "epoch",
                 "frequency": 10
@@ -134,6 +137,13 @@ class TMNet(L.LightningModule):
         loss = FCM_loss(x, x_mu, self.feat_ext, gamma=0.5, beta=0.5)
         self.log('train/loss', loss)
         return loss
+
+    def validation_step(self, batch, batch_idx):
+        x_low, x_mid, x_high, _, _ = batch
+        x = self(x_low, x_mid, x_high)
+        brisque = evaluate_batch(x)
+        self.log('val/brisque', brisque, on_epoch=True)
+        return brisque
 
 
 if __name__ == '__main__':

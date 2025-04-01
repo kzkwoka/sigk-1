@@ -38,7 +38,17 @@ def tone_map_mantiuk(image: ndarray) -> ndarray:
     return result
 
 
-def evaluate_image(image: ndarray) -> float:
+def evaluate_batch(images: torch.Tensor) -> float:
+    b = 0
+    for i in images:
+        b += evaluate_image(i)
+    b /= len(images)
+    return b
+
+
+def evaluate_image(image) -> float:
+    if isinstance(image, torch.Tensor):
+        image = image.permute(1, 2, 0).cpu().numpy()
     metric = BRISQUE(url=False)
     return metric.score(img=image)
 
