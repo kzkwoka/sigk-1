@@ -25,7 +25,7 @@ class TMDataset(Dataset):
         i_hdr = norm_mean(i_src)
         i_mu = self.tensor(mu_law(i_hdr))
         i_low, i_mid, i_high = multi_exposure(self.tensor(i_hdr))
-        return i_low, i_mid, i_high, i_mu
+        return i_low, i_mid, i_high, i_mu, i_src
 
 
 if __name__ == '__main__':

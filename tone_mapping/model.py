@@ -129,7 +129,7 @@ class TMNet(L.LightningModule):
         }
 
     def training_step(self, batch, batch_idx):
-        x_low, x_mid, x_high, x_mu = batch
+        x_low, x_mid, x_high, x_mu, _ = batch
         x = self(x_low, x_mid, x_high)
         loss = FCM_loss(x, x_mu, gamma=0.5, beta=0.5)
         self.log('train_loss', loss)
