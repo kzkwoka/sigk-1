@@ -25,10 +25,11 @@ if __name__ == '__main__':
     args = parse_args()
 
     model = TMNet(3)
-    dataset = TMDataset('tone_mapping/sihdr/resized')
+    dataset_train = TMDataset('tone_mapping/sihdr/split/train')
+    dataset_valid = TMDataset('tone_mapping/sihdr/split/valid')
 
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=15)
-    val_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=15)
+    train_loader = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=15)
+    val_loader = torch.utils.data.DataLoader(dataset_valid, batch_size=args.batch_size, shuffle=False, num_workers=15)
 
     logger = WandbLogger(log_model=True, project="SIGK-2", save_dir="logs")
     logger.watch(model, log="all")

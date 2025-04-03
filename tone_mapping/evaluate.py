@@ -12,7 +12,7 @@ if __name__ == '__main__':
     model = TMNet.load_from_checkpoint(path, in_channels=3)
     model.eval()
 
-    dataset = TMDataset('tone_mapping/sihdr/resized')
+    dataset = TMDataset('tone_mapping/sihdr/split/test')
 
     b_net, b_reinhard, b_mantiuk = 0, 0, 0
     for i_low, i_mid, i_high, i_mu, i_src in tqdm(dataset):
