@@ -2,3 +2,8 @@
 __pycache__/
 
 div2k/
+logs/
+pdfs/
+
+tone_mapping/sihdr/reference
+tone_mapping/sihdr/resized
