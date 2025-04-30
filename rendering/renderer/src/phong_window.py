@@ -26,11 +26,10 @@ class PhongWindow(BaseWindow):
         self.ctx.clear(0.0, 0.0, 0.0, 0.0)
         self.ctx.enable(moderngl.DEPTH_TEST | moderngl.CULL_FACE)
 
-        # todo: Randomize
-        model_translation = [5.0, 0.0, 0.0]
-        material_diffuse = [1.0, 0.0, 0.0]
-        material_shininess = 5
-        light_position = [15.0, 5.0, 0.0]
+        model_translation = np.random.uniform(-20.0, 20.0, size=3)
+        material_diffuse = np.random.uniform(0.0, 1.0, size=3)
+        material_shininess = np.random.uniform(3.0, 20.0)
+        light_position = np.random.uniform(-20.0, 20.0, size=3)
 
         camera_position = [5.0, 5.0, 15.0]
         model_matrix = Matrix44.from_translation(model_translation)
@@ -57,4 +56,8 @@ class PhongWindow(BaseWindow):
                      .transpose(Image.Transpose.FLIP_TOP_BOTTOM)
             )
             img.save(os.path.join(self.output_path, f'image_{self.frame:04}.png'))
+            params = [self.frame] + model_translation.tolist() + material_diffuse.tolist() + [
+                material_shininess] + light_position.tolist()
+            with open(os.path.join(self.output_path, f'params.csv'), 'a+') as f:
+                f.write(','.join(map(str, params)) + '\n')
             self.frame += 1

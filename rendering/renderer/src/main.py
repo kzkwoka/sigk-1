@@ -19,10 +19,10 @@ class TaskType(Enum):
 
     PHONG = Task(
         [
-            "--shaders_dir_path=../resources/shaders/phong",
+            "--shaders_dir_path=./resources/shaders/phong",
             "--shader_name=phong",
             "--model_name=sphere.obj",
-            "--output_path=../output/"
+            "--output_path=../dataset/"
         ],
         PhongWindow
     )
