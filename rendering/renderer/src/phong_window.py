@@ -4,6 +4,7 @@ import moderngl
 import numpy as np
 from PIL import Image
 from pyrr import Matrix44
+from scipy.stats import truncnorm
 
 from base_window import BaseWindow
 
@@ -12,6 +13,7 @@ class PhongWindow(BaseWindow):
 
     def __init__(self, **kwargs):
         super(PhongWindow, self).__init__(**kwargs)
+        self.frames = self.argv.frames
         self.frame = 0
 
     def init_shaders_variables(self):
@@ -22,11 +24,22 @@ class PhongWindow(BaseWindow):
         self.light_position = self.program["light_position"]
         self.camera_position = self.program["camera_position"]
 
+    @classmethod
+    def add_arguments(cls, parser):
+        super(PhongWindow, cls).add_arguments(parser)
+        parser.add_argument('--frames', type=int, required=True, help='Number of frames to render')
+
     def on_render(self, time: float, frame_time: float):
+        if self.frame >= self.frames:
+            self.wnd.close()
+            return
+
         self.ctx.clear(0.0, 0.0, 0.0, 0.0)
         self.ctx.enable(moderngl.DEPTH_TEST | moderngl.CULL_FACE)
 
-        model_translation = np.random.uniform(-20.0, 20.0, size=3)
+        # model_translation = np.random.uniform(-20.0, 20.0, size=3)
+        a_, b_ = -20 / 7, 20 / 7
+        model_translation = truncnorm.rvs(a_, b_, loc=0, scale=7, size=3)
         material_diffuse = np.random.uniform(0.0, 1.0, size=3)
         material_shininess = np.random.uniform(3.0, 20.0)
         light_position = np.random.uniform(-20.0, 20.0, size=3)
@@ -61,3 +74,5 @@ class PhongWindow(BaseWindow):
             with open(os.path.join(self.output_path, f'params.csv'), 'a+') as f:
                 f.write(','.join(map(str, params)) + '\n')
             self.frame += 1
+            if self.frame % 100 == 0:
+                print(f"Saved {self.frame} images.")
