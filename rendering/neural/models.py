@@ -11,15 +11,24 @@ from flip_evaluator import evaluate as flip
 
 
 class Generator(nn.Module):
-    def __init__(self, ngf=64, nc=4, z_dim=100, c_dim=10):
+    def __init__(self, ngf=64, nc=4, c_dim=10):
         super(Generator, self).__init__()
+        self.ngf = ngf
+        self.fc = nn.Sequential(
+            nn.Linear(c_dim, 512),
+            nn.ReLU(True),
+            # nn.Linear(1024, 4096),
+            # nn.ReLU(True),
+            nn.Linear(512, ngf * 8 * 8 * 8),
+            nn.ReLU(True)
+        )
         self.model = nn.Sequential(
-            nn.ConvTranspose2d(z_dim + c_dim, ngf * 16, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf * 16),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(ngf * 16, ngf * 8, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 8),
-            nn.ReLU(True),
+            # nn.ConvTranspose2d(c_dim, ngf * 16, 4, 1, 0, bias=False),
+            # nn.BatchNorm2d(ngf * 16),
+            # nn.ReLU(True),
+            # nn.ConvTranspose2d(ngf * 16, ngf * 8, 4, 2, 1, bias=False),
+            # nn.BatchNorm2d(ngf * 8),
+            # nn.ReLU(True),
             nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 4),
             nn.ReLU(True),
@@ -35,16 +44,17 @@ class Generator(nn.Module):
 
         self.apply(weights_init)
 
-    def forward(self, z, c):
-        x = torch.cat([z, c], dim=1)
+    def forward(self, c):
+        x = self.fc(c)
+        x = x.view(-1, self.ngf * 8, 8, 8)
         return self.model(x)
 
 
 class Discriminator(nn.Module):
-    def __init__(self, ndf=64, nc=4, c_dim=10):
+    def __init__(self, ndf=64, nc=4):
         super(Discriminator, self).__init__()
         self.model = nn.Sequential(
-            nn.Conv2d(nc + c_dim, ndf, 4, 2, 1, bias=False),
+            nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 2),
@@ -59,12 +69,12 @@ class Discriminator(nn.Module):
             nn.BatchNorm2d(ndf * 16),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(ndf * 16, 1, 4, 1, 0, bias=False),
+            nn.Flatten(),
             nn.Sigmoid()
         )
         self.apply(weights_init)
 
-    def forward(self, x, c):
-        x = torch.cat([x, c], dim=1)
+    def forward(self, x):
         return self.model(x)
 
 
@@ -72,83 +82,79 @@ class GAN(L.LightningModule):
     def __init__(
             self,
             channels,
-            # width,
-            # height,
-            latent_dim: int = 100,
             condition_dim: int = 10,
             lr: float = 0.0002,
-            b1: float = 0.5,
-            b2: float = 0.999,
-            batch_size: int = 64,
             **kwargs,
     ):
         super().__init__()
         self.save_hyperparameters()
         self.automatic_optimization = False
 
-        self.generator = Generator(z_dim=self.hparams.latent_dim, c_dim=self.hparams.condition_dim,
-                                   nc=self.hparams.channels, ngf=self.hparams.ngf)
-        self.discriminator = Discriminator(c_dim=self.hparams.condition_dim, nc=self.hparams.channels,
-                                           ndf=self.hparams.ndf)
+        self.generator = Generator(c_dim=condition_dim, nc=channels, ngf=self.hparams.ngf)
+        self.discriminator = Discriminator(nc=channels, ndf=self.hparams.ndf)
 
-        # self.validation_z = torch.randn(8, self.hparams.latent_dim)
-
-        # self.example_input_array = torch.zeros(2, self.hparams.latent_dim)
-
-    def forward(self, z, c):
-        return self.generator(z, c)
+    def forward(self, c):
+        return self.generator(c)
 
     def adversarial_loss(self, y_hat, y, reduction='mean'):
         return F.binary_cross_entropy(y_hat, y, reduction=reduction)
 
-    def _train_generator(self, z, imgs, conds, optimizer_g, lambda_l1=100):
+    def on_train_epoch_start(self):
+        total_epochs = self.trainer.max_epochs
+        progress = self.current_epoch / total_epochs
+
+        self.lambda_l1 = self.hparams.lambda_l1
+        self.lambda_adv = 1
+
+        # self.lambda_l1 = self.hparams.lambda_l1 * (1.0 - progress)  # from 100 → 0
+        # self.lambda_adv = 1.0 * progress  # from 0 → 1.0
+
+        self.log("train/lambda_l1", self.lambda_l1)
+        self.log("train/lambda_adv", self.lambda_adv)
+
+
+    def _train_generator(self, imgs, optimizer_g):
         # generate images
         self.toggle_optimizer(optimizer_g)
-        conds = conds.view(conds.size(0), -1, 1, 1)
-        # visibility_mask = torch.where(
-        #     imgs.sum() > 0,
-        #     torch.full((imgs.size(0),), 2.0, device=imgs.device),
-        #     torch.full((imgs.size(0),), 0.2, device=imgs.device)
-        # )
-        visibility_mask = 1
-        self.generated_imgs = self(z, conds)
 
-        valid = torch.ones(imgs.size(0), 1)
+        valid = torch.full((imgs.size(0), 1), 0.9)  # Smooth labels
         valid = valid.type_as(imgs)
+        target = 2 * imgs[:, :self.hparams.channels] - 1  # Using tanh() so [-1, 1]
+        alpha = imgs[:, self.hparams.channels]
 
-        conds = conds.expand(-1, -1, imgs.size(2), imgs.size(3))
-        g_loss = self.adversarial_loss(self.discriminator(self.generated_imgs, conds).squeeze(-1).squeeze(-1), valid,
-                                       'none')
+        # Adversarial loss
+        g_loss = self.adversarial_loss(self.discriminator(self.generated_imgs), valid)
+        self.log("train/g_adv_loss", g_loss)
+        # Weighted L1 loss
+        l1_perpixel = F.l1_loss(self.generated_imgs, target, reduction='none').mean(dim=1)
+        fg_loss = (l1_perpixel * alpha).sum() / (alpha.sum() + 1e-6)
+        bg_loss = (l1_perpixel * (1 - alpha)).sum() / ((1 - alpha).sum() + 1e-6)
+        l1_loss = fg_loss + self.hparams.bg_weight * bg_loss
+        self.log("train/g_l1_loss", l1_loss)
+        # Total loss
+        g_loss = self.lambda_adv * g_loss + self.lambda_l1 * l1_loss
+        self.log("train/g_loss", g_loss, prog_bar=True)
 
-        self.log("train/g_loss", g_loss.mean(), prog_bar=True)
-
-        l1_loss = F.l1_loss(self.generated_imgs, imgs[:, :self.hparams.channels], reduction='none').mean(dim=[1, 2, 3])
-        self.log("train/g_l1_loss", l1_loss.mean(), prog_bar=True)
-
-        g_loss = (g_loss * visibility_mask).mean() + lambda_l1 * (l1_loss * visibility_mask).mean()
         self.manual_backward(g_loss)
         optimizer_g.step()
         optimizer_g.zero_grad()
 
         self.untoggle_optimizer(optimizer_g)
 
-    def _train_discriminator(self, imgs, conds, optimizer_d):
+    def _train_discriminator(self, imgs, optimizer_d):
         self.toggle_optimizer(optimizer_d)
 
-        conds = conds.view(conds.size(0), conds.size(1), 1, 1).repeat(1, 1, imgs.size(2), imgs.size(3))
-
-        valid = torch.ones(imgs.size(0), 1)
+        # Real images loss
+        valid = torch.full((imgs.size(0), 1), 0.9)  # Smooth labels
         valid = valid.type_as(imgs)
-        real_loss = self.adversarial_loss(
-            self.discriminator(imgs[:, :self.hparams.channels], conds).squeeze(-1).squeeze(-1), valid)
+        real_loss = self.adversarial_loss(self.discriminator(imgs[:, :self.hparams.channels]), valid)
         self.log("train/d_real_loss", real_loss)
-
+        # Fake images loss
         fake = torch.zeros(imgs.size(0), 1)
         fake = fake.type_as(imgs)
-        fake_loss = self.adversarial_loss(
-            self.discriminator(self.generated_imgs.detach(), conds).squeeze(-1).squeeze(-1), fake)
+        fake_loss = self.adversarial_loss(self.discriminator(self.generated_imgs.detach()), fake)
         self.log("train/d_fake_loss", fake_loss)
-
+        # Total loss
         d_loss = (real_loss + fake_loss) / 2
         self.log("train/d_loss", d_loss, prog_bar=True)
 
@@ -164,39 +170,26 @@ class GAN(L.LightningModule):
 
         optimizer_g, optimizer_d = self.optimizers()
 
-        # sample noise
-        z = torch.randn(imgs.shape[0], self.hparams.latent_dim, 1, 1)
-        z = z.type_as(imgs)
-
-        # train generator
-        self._train_generator(z, imgs, conds, optimizer_g)
+        # conds = conds.view(conds.size(0), -1, 1, 1)
+        self.generated_imgs = self(conds)
 
         # train discriminator
-        self._train_discriminator(imgs, conds, optimizer_d)
+        self._train_discriminator(imgs, optimizer_d)
+
+        # train generator
+        self._train_generator(imgs, optimizer_g)
 
         # log sampled images
         if batch_idx % 10 == 0:
-            if self.hparams.channels == 3:
-                mode = 'RGB'
-                sample_imgs = torch.cat((self.generated_imgs[:6], imgs[:6, :3]), dim=0)
-            else:
-                mode = 'RGBA'
-                sample_imgs = torch.cat((self.generated_imgs[:6], imgs[:6]), dim=0)
-            grid = torchvision.transforms.ToPILImage()(torchvision.utils.make_grid(sample_imgs, nrow=6))
-            wandb.log({"train/images": wandb.Image(grid, mode=mode)})
+            self._plot_batch(imgs, "train/images")
 
     def validation_step(self, batch, batch_idx):
         imgs, conds = batch
         conds = conds.type_as(imgs)
 
-        z = torch.randn(imgs.shape[0], self.hparams.latent_dim, 1, 1)
-        z = z.type_as(imgs)
+        self.generated_imgs = self(conds)
 
-        conds = conds.view(conds.size(0), -1, 1, 1)
-
-        self.generated_imgs = self(z, conds)
-
-        l1_loss = F.l1_loss(self.generated_imgs, imgs[:, :self.hparams.channels])
+        l1_loss = F.l1_loss(self.generated_imgs, 2 * imgs[:, :self.hparams.channels] - 1)
         self.log("val/l1_loss", l1_loss, prog_bar=True, on_epoch=True)
 
         flip_scores = []
@@ -211,28 +204,27 @@ class GAN(L.LightningModule):
 
         # log sampled images
         if batch_idx % 10 == 0:
-            if self.hparams.channels == 3:
-                mode = 'RGB'
-                sample_imgs = torch.cat((self.generated_imgs[:6], imgs[:6, :3]), dim=0)
-            else:
-                mode = 'RGBA'
-                sample_imgs = torch.cat((self.generated_imgs[:6], imgs[:6]), dim=0)
-            grid = torchvision.utils.make_grid(sample_imgs, nrow=6)
-            wandb.log({"val/images": wandb.Image(grid, mode=mode)})
+            self._plot_batch(imgs, "val/images")
+
+    def _plot_batch(self, imgs, name, n=6):
+        if self.hparams.channels == 3:
+            mode = 'RGB'
+            sample_imgs = torch.cat((self.generated_imgs[:n], imgs[:n, :3]), dim=0)
+        else:
+            mode = 'RGBA'
+            sample_imgs = torch.cat((self.generated_imgs[:n], imgs[:n]), dim=0)
+        grid = torchvision.transforms.functional.to_pil_image(torchvision.utils.make_grid(sample_imgs,
+                                                                                          nrow=n,
+                                                                                          pad_value=1,
+                                                                                          padding=5
+                                                                                          ), mode=mode)
+        wandb.log({name: wandb.Image(grid, mode=mode)})
 
     def configure_optimizers(self):
         lr = self.hparams.lr
-        b1 = self.hparams.b1
-        b2 = self.hparams.b2
+        b1 = 0.5
+        b2 = 0.999
 
         opt_g = torch.optim.Adam(self.generator.parameters(), lr=lr, betas=(b1, b2))
         opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=lr / 10, betas=(b1, b2))
         return [opt_g, opt_d], []
-
-    # def on_validation_epoch_end(self):
-    #     z = self.validation_z.type_as(self.generator.model[0].weight)
-
-    #     # log sampled images
-    #     sample_imgs = self(z, params)
-    #     grid = torchvision.utils.make_grid(sample_imgs)
-    #     self.logger.experiment.add_image("validation/generated_images", grid, self.current_epoch)

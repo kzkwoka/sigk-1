@@ -14,7 +14,7 @@ class RenderDataset(Dataset):
         self.camera_pos = (5.0, 5.0, 15.0)
         self._load_conditions(param_file)
 
-        self.tensor = ToTensor()
+        self.transforms = ToTensor()
 
     def _load_conditions(self, fname):
         self.params_df = pd.read_csv(os.path.join(self.data_dir, fname), header=None)
@@ -53,14 +53,13 @@ class RenderDataset(Dataset):
             'rel_trans_x': (-20.0 - self.camera_pos[0], 20.0 - self.camera_pos[0]),
             'rel_trans_y': (-20.0 - self.camera_pos[1], 20.0 - self.camera_pos[1]),
             'rel_trans_z': (-20.0 - self.camera_pos[2], 20.0 - self.camera_pos[2]),
-
             'rel_light_x': (-20.0 - self.camera_pos[0], 20.0 - self.camera_pos[0]),
             'rel_light_y': (-20.0 - self.camera_pos[1], 20.0 - self.camera_pos[1]),
             'rel_light_z': (-20.0 - self.camera_pos[2], 20.0 - self.camera_pos[2]),
         }
 
         for column, (min_val, max_val) in column_ranges.items():
-            self.params_df[column] = (self.params_df[column] - min_val) / (max_val - min_val)
+            self.params_df[column] = ((self.params_df[column] - min_val) / (max_val - min_val)) * 2 - 1
     
     def _get_conditions(self, idx, relative=False):
         if relative:
@@ -76,7 +75,8 @@ class RenderDataset(Dataset):
             raise FileNotFoundError(f"Image {image_path} not found.")
 
         img = Image.open(image_path).convert('RGBA')
-        return self.tensor(img), self._get_conditions(idx, relative=True)
+
+        return self.transforms(img), self._get_conditions(idx, relative=True)
 
 
 if __name__ == '__main__':
