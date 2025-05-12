@@ -24,6 +24,7 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=0.0002, help="Learning rate for the generator optimizer")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training")
     parser.add_argument("--epochs", type=int, default=100, help="Number of epochs to train")
+    parser.add_argument("--warmup_epochs", type=int, default=0, help="Number of warmup epochs")
     parser.add_argument("--ngf", type=int, default=64, help="Number of generator filters")
     parser.add_argument("--ndf", type=int, default=64, help="Number of discriminator filters")
 
@@ -35,6 +36,7 @@ if __name__ == '__main__':
 
     model = GAN(channels=args.channels, condition_dim=args.c_dim, lr=args.lr,
                 ngf=args.ngf, ndf=args.ndf,
+                warmup_epochs=args.warmup_epochs,
                 bg_weight=1, lambda_l1=100)
     dataset = RenderDataset("dataset_normal_max/")
 
@@ -49,7 +51,7 @@ if __name__ == '__main__':
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
 
     checkpoint_callback = ModelCheckpoint(
-        dirpath="ckpts/",
+        dirpath=f"ckpts/{logger.experiment.name}/",
         monitor="val/l1_loss",
         mode="min",
         save_top_k=1,
