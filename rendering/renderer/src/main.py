@@ -24,8 +24,8 @@ class TaskType(Enum):
             "--shaders_dir_path=./resources/shaders/phong",
             "--shader_name=phong",
             "--model_name=sphere.obj",
-            "--output_path=../dataset_test1/",
-            "--frames=10"
+            "--output_path=../dataset/",
+            "--frames=10000"
         ],
         PhongWindow
     )
@@ -35,7 +35,7 @@ class TaskType(Enum):
             "--shaders_dir_path=./resources/shaders/phong",
             "--shader_name=phong",
             "--model_name=sphere.obj",
-            "--output_path=../dataset_ref_test/",
+            "--output_path=../dataset_ref/",
             "--frames=12",
             "--ref_path=resources/params.csv"
         ],
@@ -46,8 +46,8 @@ class TaskType(Enum):
             "--shaders_dir_path=./resources/shaders/phong_neural",
             "--shader_name=phong",
             "--model_name=sphere.obj",
-            "--output_path=../dataset_test_2/",
-            "--frames=10",
+            "--output_path=../dataset/",
+            "--frames=10000",
             "--ckpt_path=../ckpts/twilight-butterfly-116/best-model.ckpt"
         ],
         NPhongWindow
@@ -58,7 +58,7 @@ class TaskType(Enum):
             "--shaders_dir_path=./resources/shaders/phong_neural",
             "--shader_name=phong",
             "--model_name=sphere.obj",
-            "--output_path=../dataset_n_test/",
+            "--output_path=../dataset_n/",
             "--frames=12",
             "--ckpt_path=../ckpts/twilight-butterfly-116/best-model.ckpt",
             "--ref_path=resources/params.csv"
