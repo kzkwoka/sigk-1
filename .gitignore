@@ -9,3 +9,5 @@ tone_mapping/sihdr/reference
 tone_mapping/sihdr/resized
 
 rendering/dataset*
+rendering/ckpts
+rendering/neural/wandb
