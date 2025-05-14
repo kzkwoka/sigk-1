@@ -5,7 +5,10 @@ import lightning as L
 import torchvision
 import wandb
 
-from utils import weights_init
+try:
+    from utils import weights_init
+except ImportError:
+    from .utils import weights_init
 
 from flip_evaluator import evaluate as flip
 
@@ -25,18 +28,18 @@ class Generator(nn.Module):
         self.model = nn.Sequential(
             nn.Upsample(scale_factor=2),  # 8 → 16
             nn.Conv2d(ngf * 4, ngf * 2, 3, padding=1),
-            nn.ReLU(),
             nn.BatchNorm2d(ngf * 2),
+            nn.ReLU(),
 
             nn.Upsample(scale_factor=2),  # 16 → 32
             nn.Conv2d(ngf * 2, ngf, 3, padding=1),
-            nn.ReLU(),
             nn.BatchNorm2d(ngf),
+            nn.ReLU(),
 
             nn.Upsample(scale_factor=2),  # 32 → 64
             nn.Conv2d(ngf, ngf // 2, 3, padding=1),
-            nn.ReLU(),
             nn.BatchNorm2d(ngf // 2),
+            nn.ReLU(),
 
             nn.Upsample(scale_factor=2),  # 64 → 128
             nn.Conv2d(ngf // 2, nc, 3, padding=1),
@@ -112,9 +115,11 @@ class GAN(L.LightningModule):
 
         self.lambda_l1 = self.hparams.lambda_l1
         self.lambda_adv = 1
+        self.bg_weight = self.hparams.bg_weight
 
         # self.lambda_l1 = self.hparams.lambda_l1 * (1.0 - progress)  # from 100 → 0
-        # self.lambda_adv = 1.0 * progress  # from 0 → 1.0
+        # self.lambda_adv = 10.0 * progress  # from 0 → 10.0
+        # self.bg_weight = self.hparams.bg_weight * (1.0 - progress)  # from 1.0 → 0.0
 
         self.log("train/lambda_l1", self.lambda_l1)
         self.log("train/lambda_adv", self.lambda_adv)
@@ -123,7 +128,7 @@ class GAN(L.LightningModule):
         # generate images
         self.toggle_optimizer(optimizer_g)
 
-        valid = torch.full((imgs.size(0), 1), 0.9)  # Smooth labels
+        valid = torch.full((imgs.size(0), 1), 1)  # No smoothing
         valid = valid.type_as(imgs)
         target = 2 * imgs[:, :self.hparams.channels] - 1  # Using tanh() so [-1, 1]
         alpha = imgs[:, self.hparams.channels]
@@ -132,7 +137,8 @@ class GAN(L.LightningModule):
         l1_perpixel = F.l1_loss(self.generated_imgs, target, reduction='none').mean(dim=1)
         fg_loss = (l1_perpixel * alpha).sum() / (alpha.sum() + 1e-6)
         bg_loss = (l1_perpixel * (1 - alpha)).sum() / ((1 - alpha).sum() + 1e-6)
-        l1_loss = fg_loss + self.hparams.bg_weight * bg_loss
+        #TODO: weigh foregorund more
+        l1_loss = fg_loss + self.bg_weight * bg_loss
         self.log("train/g_l1_loss", l1_loss)
 
         if not warmup:
@@ -181,7 +187,6 @@ class GAN(L.LightningModule):
 
         optimizer_g, optimizer_d = self.optimizers()
 
-        # conds = conds.view(conds.size(0), -1, 1, 1)
         self.generated_imgs = self(conds)
 
         if self.current_epoch < self.hparams.warmup_epochs:
@@ -243,5 +248,5 @@ class GAN(L.LightningModule):
         b2 = 0.999
 
         opt_g = torch.optim.Adam(self.generator.parameters(), lr=lr, betas=(b1, b2))
-        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=lr / 10, betas=(b1, b2))
+        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=lr/10, betas=(b1, b2))
         return [opt_g, opt_d], []
