@@ -15,7 +15,7 @@ class PhongWindow(BaseWindow):
         super(PhongWindow, self).__init__(**kwargs)
         self.frames = self.argv.frames
         self.frame = 0
-        self.scene_params = np.loadtxt('resources/params.csv', delimiter=',')
+        self.scene_params = np.loadtxt(self.argv.ref_path, delimiter=',') if self.argv.ref_path is not None else None
 
     def init_shaders_variables(self):
         self.model_view_projection = self.program["model_view_projection"]
@@ -38,14 +38,18 @@ class PhongWindow(BaseWindow):
         self.ctx.clear(0.0, 0.0, 0.0, 0.0)
         self.ctx.enable(moderngl.DEPTH_TEST | moderngl.CULL_FACE)
 
-        # model_translation = np.random.uniform(-20.0, 20.0, size=3)
-        # a_, b_ = -20 / 7, 20 / 7
-        # model_translation = truncnorm.rvs(a_, b_, loc=0, scale=7, size=3)
-        # material_diffuse = np.random.uniform(0.0, 1.0, size=3)
-        # material_shininess = np.random.uniform(3.0, 20.0)
-        # light_position = np.random.uniform(-20.0, 20.0, size=3)
-        scene_params = self.scene_params[self.frame]
-        model_translation, light_position, [material_shininess], material_diffuse = np.split(scene_params, [3, 6, 7])
+        if self.scene_params is not None:
+            scene_params = self.scene_params[self.frame]
+            model_translation, light_position, [material_shininess], material_diffuse = np.split(scene_params,
+                                                                                                 [3, 6, 7])
+        else:
+            # model_translation = np.random.uniform(-20.0, 20.0, size=3)
+            a_, b_ = -20 / 7, 20 / 7
+            model_translation = truncnorm.rvs(a_, b_, loc=0, scale=7, size=3)
+            material_diffuse = np.random.uniform(0.0, 1.0, size=3)
+            material_shininess = np.random.uniform(3.0, 20.0)
+            light_position = np.random.uniform(-20.0, 20.0, size=3)
+
 
         camera_position = [5.0, 5.0, 15.0]
         model_matrix = Matrix44.from_translation(model_translation)

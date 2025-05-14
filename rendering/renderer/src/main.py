@@ -1,3 +1,4 @@
+import argparse
 from collections import namedtuple
 from enum import Enum
 
@@ -23,8 +24,20 @@ class TaskType(Enum):
             "--shaders_dir_path=./resources/shaders/phong",
             "--shader_name=phong",
             "--model_name=sphere.obj",
-            "--output_path=../dataset_ref/",
-            "--frames=12"
+            "--output_path=../dataset_test1/",
+            "--frames=10"
+        ],
+        PhongWindow
+    )
+
+    PHONG_REF = Task(
+        [
+            "--shaders_dir_path=./resources/shaders/phong",
+            "--shader_name=phong",
+            "--model_name=sphere.obj",
+            "--output_path=../dataset_ref_test/",
+            "--frames=12",
+            "--ref_path=resources/params.csv"
         ],
         PhongWindow
     )
@@ -33,13 +46,46 @@ class TaskType(Enum):
             "--shaders_dir_path=./resources/shaders/phong_neural",
             "--shader_name=phong",
             "--model_name=sphere.obj",
-            "--output_path=../dataset_n/",
-            "--frames=12"
+            "--output_path=../dataset_test_2/",
+            "--frames=10",
+            "--ckpt_path=../ckpts/twilight-butterfly-116/best-model.ckpt"
         ],
         NPhongWindow
     )
 
+    PHONG_NEURAL_REF = Task(
+        [
+            "--shaders_dir_path=./resources/shaders/phong_neural",
+            "--shader_name=phong",
+            "--model_name=sphere.obj",
+            "--output_path=../dataset_n_test/",
+            "--frames=12",
+            "--ckpt_path=../ckpts/twilight-butterfly-116/best-model.ckpt",
+            "--ref_path=resources/params.csv"
+        ],
+        NPhongWindow
+    )
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Render a scene with different shaders.")
+    parser.add_argument('--neural', action='store_true', default=False,
+                        help='Render using neural shading.')
+    parser.add_argument('--reference', action='store_true', default=False,
+                        help='Generate scenes from reference file.')
+    args = parser.parse_args()
+    return args
+
 
 if __name__ == '__main__':
-    task = TaskType.PHONG_NEURAL
+    args = parse_args()
+    if args.neural:
+        if args.reference:
+            task = TaskType.PHONG_NEURAL_REF
+        else:
+            task = TaskType.PHONG_NEURAL
+    else:
+        if args.reference:
+            task = TaskType.PHONG_REF
+        else:
+            task = TaskType.PHONG
     moderngl_window.run_window_config(task.window_cls, args=task.window_args)

@@ -18,13 +18,13 @@ class PhongWindow(BaseWindow):
         self.frames = self.argv.frames
         self.frame = 0
 
-        self.scene_params = np.loadtxt('resources/params.csv', delimiter=',')
+        self.ckpt_path = self.argv.ckpt_path
+        self.scene_params = np.loadtxt(self.argv.ref_path, delimiter=',') if self.argv.ref_path is not None else None
 
         self.nn_texture = None
 
     def init_shaders_variables(self):
         self.model_view_projection = self.program["model_view_projection"]
-        # self.model_matrix = self.program["model_matrix"]
         self.nn_texture = self.program["nn_texture"]
 
     @classmethod
@@ -50,8 +50,7 @@ class PhongWindow(BaseWindow):
         params = self.get_relative_params(scene_params, camera_position)
         params = self.normalize_params(params)
 
-        ckpt_path = "../ckpts/crisp-rain-103/best-model.ckpt"
-        model = GAN.load_from_checkpoint(ckpt_path)
+        model = GAN.load_from_checkpoint(self.ckpt_path)
         model.eval()
         with torch.no_grad():
             out = model(torch.from_numpy(params).float().to("cuda"))[0].cpu().permute(1, 2, 0).numpy()
@@ -66,18 +65,20 @@ class PhongWindow(BaseWindow):
         self.ctx.clear(0.0, 0.0, 0.0, 0.0)
         self.ctx.enable(moderngl.DEPTH_TEST | moderngl.CULL_FACE)
 
-        # model_translation = np.random.uniform(-20.0, 20.0, size=3)
-        # a_, b_ = -20 / 7, 20 / 7
-        # model_translation = truncnorm.rvs(a_, b_, loc=0, scale=7, size=3)
-        # material_diffuse = np.random.uniform(0.0, 1.0, size=3)
-        # material_shininess = np.random.uniform(3.0, 20.0)
-        # light_position = np.random.uniform(-20.0, 20.0, size=3)
-        # scene_params = np.concatenate(
-        #     [model_translation, light_position, [material_shininess], material_diffuse]
-        # )
-
-        scene_params = self.scene_params[self.frame]
-        model_translation, light_position, [material_shininess], material_diffuse = np.split(scene_params, [3, 6, 7])
+        if self.scene_params is not None:
+            scene_params = self.scene_params[self.frame]
+            model_translation, light_position, [material_shininess], material_diffuse = np.split(scene_params,
+                                                                                                 [3, 6, 7])
+        else:
+            # model_translation = np.random.uniform(-20.0, 20.0, size=3)
+            a_, b_ = -20 / 7, 20 / 7
+            model_translation = truncnorm.rvs(a_, b_, loc=0, scale=7, size=3)
+            material_diffuse = np.random.uniform(0.0, 1.0, size=3)
+            material_shininess = np.random.uniform(3.0, 20.0)
+            light_position = np.random.uniform(-20.0, 20.0, size=3)
+            scene_params = np.concatenate(
+                [model_translation, light_position, [material_shininess], material_diffuse]
+            )
 
         camera_position = [5.0, 5.0, 15.0]
         nn_data = self.generate_texture(scene_params, camera_position)
@@ -96,18 +97,16 @@ class PhongWindow(BaseWindow):
             (0.0, 1.0, 0.0),
         )
 
-
         model_view_projection = proj * lookat * model_matrix
 
         self.model_view_projection.write(model_view_projection.astype('f4').tobytes())
         # self.model_matrix.write(model_matrix.astype('f4').tobytes())
 
-
         self.vao.render()
         if self.output_path:
             img = (
                 Image.frombuffer('RGBA', self.wnd.size, self.wnd.fbo.read(components=4))
-                     .transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+                .transpose(Image.Transpose.FLIP_TOP_BOTTOM)
             )
             img.save(os.path.join(self.output_path, f'image_{self.frame:04}.png'))
             params = [self.frame] + model_translation.tolist() + material_diffuse.tolist() + [

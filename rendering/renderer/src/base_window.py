@@ -48,7 +48,8 @@ class BaseWindow(WindowConfig):
                             help='Name of the shader to look for in the shader_path directory')
         parser.add_argument('--model_name', type=str, required=False, help='Name of the model to load')
         parser.add_argument('--output_path', type=str, required=False, help='Where to save an image')
-
+        parser.add_argument('--ckpt_path', type=str, required=False, help='Path to the checkpoint file')
+        parser.add_argument('--ref_path', type=str, required=False, help='Path to the reference file')
     def on_render(self, time: float, frame_time: float):
         self.ctx.clear(0.1, 0.2, 0.3, 0.0)
         self.vao.render(moderngl.TRIANGLE_STRIP)
