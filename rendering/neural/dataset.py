@@ -7,13 +7,14 @@ from torchvision.transforms import ToTensor
 
 
 class RenderDataset(Dataset):
-    def __init__(self, data_dir, param_file='params.csv'):
+    def __init__(self, data_dir, param_file='params.csv', noisy=False):
         self.data_dir = data_dir
         self.images = sorted([f for f in os.listdir(data_dir) if f.endswith('.png')])
 
         self.camera_pos = (5.0, 5.0, 15.0)
         self._load_conditions(param_file)
 
+        self.noisy = noisy
         self.transforms = ToTensor()
 
     def _load_conditions(self, fname):
@@ -56,6 +57,9 @@ class RenderDataset(Dataset):
             'rel_light_x': (-20.0 - self.camera_pos[0], 20.0 - self.camera_pos[0]),
             'rel_light_y': (-20.0 - self.camera_pos[1], 20.0 - self.camera_pos[1]),
             'rel_light_z': (-20.0 - self.camera_pos[2], 20.0 - self.camera_pos[2]),
+            'diffuse_r': (0.0, 1.0),
+            'diffuse_g': (0.0, 1.0),
+            'diffuse_b': (0.0, 1.0),
         }
 
         for column, (min_val, max_val) in column_ranges.items():
@@ -75,8 +79,12 @@ class RenderDataset(Dataset):
             raise FileNotFoundError(f"Image {image_path} not found.")
 
         img = Image.open(image_path).convert('RGBA')
+        img = self.transforms(img)
 
-        return self.transforms(img), self._get_conditions(idx, relative=True)
+        conds = self._get_conditions(idx, relative=True)
+        if self.noisy:
+            conds = conds + np.random.normal(0, 0.05, conds.shape)
+        return img, conds
 
 
 if __name__ == '__main__':
