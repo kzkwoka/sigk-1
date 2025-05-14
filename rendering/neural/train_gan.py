@@ -19,11 +19,11 @@ torch.backends.cudnn.benchmark = False
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Training script for GAN")
-    parser.add_argument("--channels", type=int, default=4, help="Number of channels in the input images")
+    parser.add_argument("--channels", type=int, default=3, help="Number of channels in the input images")
     parser.add_argument("--c_dim", type=int, default=10, help="Dimensionality of the condition space")
-    parser.add_argument("--lr", type=float, default=0.0002, help="Learning rate for the generator optimizer")
+    parser.add_argument("--lr", type=float, default=0.0005, help="Learning rate for the generator optimizer")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training")
-    parser.add_argument("--epochs", type=int, default=100, help="Number of epochs to train")
+    parser.add_argument("--epochs", type=int, default=200, help="Number of epochs to train")
     parser.add_argument("--warmup_epochs", type=int, default=0, help="Number of warmup epochs")
     parser.add_argument("--ngf", type=int, default=64, help="Number of generator filters")
     parser.add_argument("--ndf", type=int, default=64, help="Number of discriminator filters")
@@ -40,7 +40,7 @@ if __name__ == '__main__':
                 bg_weight=1, lambda_l1=100)
     dataset = RenderDataset("dataset_normal_max/")
 
-    train_set, valid_set = torch.utils.data.random_split(dataset, [0.8, 0.2], torch.Generator().manual_seed(42))
+    train_set, valid_set, _ = torch.utils.data.random_split(dataset, [0.8, 0.1, 0.1], torch.Generator().manual_seed(42))
 
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=15)
     val_loader = torch.utils.data.DataLoader(valid_set, batch_size=args.batch_size*8, shuffle=False, num_workers=15)
