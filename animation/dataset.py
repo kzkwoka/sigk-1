@@ -1,5 +1,6 @@
 import os
 import re
+from glob import glob
 
 import cv2
 import numpy as np
@@ -10,28 +11,38 @@ from torch.utils.data import Dataset
 
 
 class AnimationDataset(Dataset):
-    def __init__(self, data_path="./Depth/201403121135", transform=None):
+    def __init__(self, data_path="./Depth", transform=None):
         self.data_path = data_path
         self.transform = torchvision.transforms.ToTensor() if transform is None else transform
         pattern = re.compile(r"image_(\d+)\.png")
-
-        self.indices = sorted([
-            int(match.group(1))
-            for fname in os.listdir(data_path)
-            if (match := pattern.match(fname))
-        ])
-        index_set = set(self.indices)
-
         self.triplets = []
-        self.sequence_len = 5
+        self.sequence_len = 10
         self.mid_offset = self.sequence_len // 2
-        for i in self.indices:
-            if all((i + offset) in index_set for offset in range(self.sequence_len)):
-                self.triplets.append((
-                    i,
-                    i + self.mid_offset,
-                    i + self.sequence_len - 1
-                ))
+
+        candidate_folders = [
+            os.path.dirname(p)
+            for p in glob(os.path.join(self.data_path, "**", "image_*.png"), recursive=True)
+        ]
+        unique_folders = sorted(set(candidate_folders))
+
+        for folder in unique_folders:
+            files = os.listdir(folder)
+            indices = sorted([
+                int(match.group(1))
+                for fname in files
+                if (match := pattern.match(fname))
+            ])
+            index_set = set(indices)
+
+            for i in indices:
+                mid = i + self.mid_offset
+                end = i + self.sequence_len - 1
+                if mid in index_set and end in index_set:
+                    self.triplets.append((
+                        os.path.join(folder, f"image_{i:04d}.png"),
+                        os.path.join(folder, f"image_{mid:04d}.png"),
+                        os.path.join(folder, f"image_{end:04d}.png")
+                    ))
 
     def __len__(self):
         return len(self.triplets)
@@ -39,8 +50,7 @@ class AnimationDataset(Dataset):
     def __getitem__(self, idx):
         i0, i1, i2 = self.triplets[idx]
 
-        def load_image(index):
-            path = os.path.join(self.data_path, f"image_{index:04d}.png")
+        def load_image(path):
             depth = cv2.imread(path, cv2.IMREAD_UNCHANGED).astype(np.float32)
             # image = Image.open(path) # Convert to grayscale
             # return self.transform(image) if self.transform else image

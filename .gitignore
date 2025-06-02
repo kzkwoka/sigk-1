@@ -11,3 +11,6 @@ tone_mapping/sihdr/resized
 rendering/dataset*
 rendering/ckpts
 rendering/neural/wandb
+
+animation/Depth
+animation/ckpts
