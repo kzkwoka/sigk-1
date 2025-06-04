@@ -1,7 +1,4 @@
 import argparse
-from pathlib import Path
-
-import torch
 from torch.utils.data import DataLoader
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
@@ -13,13 +10,13 @@ from src.model import AnimationUNet
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train_dir', type=str, default='frames_merged/train', help='Path to training data')
-    parser.add_argument('--val_dir', type=str, default='frames_merged/valid', help='Path to validation data')
-    parser.add_argument('--batch_size', type=int, default=8, help='Batch size')
-    parser.add_argument('--epochs', type=int, default=100, help='Number of training epochs')
-    parser.add_argument('--channels', type=int, default=3, help='Input/output image channels')
-    parser.add_argument('--project', type=str, default='animation-interpolation', help='WandB project name')
-    parser.add_argument('--run_name', type=str, default='unet', help='WandB run name')
+    parser.add_argument("--train_dir", type=str, default="frames_merged/train", help="Path to training data")
+    parser.add_argument("--val_dir", type=str, default="frames_merged/valid", help="Path to validation data")
+    parser.add_argument("--batch_size", type=int, default=8, help="Batch size")
+    parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs")
+    parser.add_argument("--channels", type=int, default=3, help="Input/output image channels")
+    parser.add_argument("--project", type=str, default="animation-interpolation", help="WandB project name")
+    parser.add_argument("--run_name", type=str, default="unet", help="WandB run name")
     return parser.parse_args()
 
 
@@ -44,14 +41,11 @@ def main(args):
         save_top_k=1,
         verbose=True,
         dirpath="checkpoints",
-        filename="{epoch:02d}-{val_loss:.4f}"
+        filename="{epoch:02d}-{val_loss:.4f}",
     )
 
     trainer = L.Trainer(
-        max_epochs=args.epochs,
-        logger=wandb_logger,
-        log_every_n_steps=10,
-        callbacks=[checkpoint_callback]
+        max_epochs=args.epochs, logger=wandb_logger, log_every_n_steps=10, callbacks=[checkpoint_callback]
     )
 
     # Fit

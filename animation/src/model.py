@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 import lightning as L
-import torchvision
-import wandb
 
 from torchmetrics.image import PeakSignalNoiseRatio as PSNR
 from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
@@ -19,28 +17,16 @@ class UNet(nn.Module):
         )
         self.pool1 = nn.MaxPool2d(2)
 
-        self.encoder2 = nn.Sequential(
-            nn.Conv2d(16, 32, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True)
-        )
+        self.encoder2 = nn.Sequential(nn.Conv2d(16, 32, kernel_size=3, padding=1), nn.ReLU(inplace=True))
         self.pool2 = nn.MaxPool2d(2)
 
-        self.bottleneck = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True)
-        )
+        self.bottleneck = nn.Sequential(nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.ReLU(inplace=True))
 
         self.up2 = nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2)
-        self.decoder2 = nn.Sequential(
-            nn.Conv2d(64, 32, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True)
-        )
+        self.decoder2 = nn.Sequential(nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.ReLU(inplace=True))
 
         self.up1 = nn.ConvTranspose2d(32, 16, kernel_size=2, stride=2)
-        self.decoder1 = nn.Sequential(
-            nn.Conv2d(32, 16, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True)
-        )
+        self.decoder1 = nn.Sequential(nn.Conv2d(32, 16, kernel_size=3, padding=1), nn.ReLU(inplace=True))
 
         self.out_conv = nn.Conv2d(16, channels, kernel_size=1)
 
@@ -70,18 +56,18 @@ class AnimationUNet(L.LightningModule):
         loss = self.criterion(output, target)
         return loss
 
-    def log_eval_metrics(self, output, target, prefix=''):
+    def log_eval_metrics(self, output, target, prefix=""):
         ssim = self.ssim(output, target)
         psnr = self.psnr(output, target)
-        self.log(f'{prefix}/ssim', ssim, on_epoch=True)
-        self.log(f'{prefix}/psnr', psnr, on_epoch=True)
+        self.log(f"{prefix}/ssim", ssim, on_epoch=True)
+        self.log(f"{prefix}/psnr", psnr, on_epoch=True)
 
     def training_step(self, batch, batch_idx):
         frame0, frame1, frame2 = batch
         input_pair = torch.cat([frame0, frame2], dim=1)
         output = self(input_pair)
         loss = self.compute_loss(output, frame1)
-        self.log('train/loss', loss, on_step=True, on_epoch=True)
+        self.log("train/loss", loss, on_step=True, on_epoch=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -89,8 +75,8 @@ class AnimationUNet(L.LightningModule):
         input_pair = torch.cat([frame0, frame2], dim=1)
         output = self(input_pair)
         loss = self.compute_loss(output, frame1)
-        self.log('val/loss', loss, on_epoch=True)
-        self.log_eval_metrics(output, frame1, prefix='val')
+        self.log("val/loss", loss, on_epoch=True)
+        self.log_eval_metrics(output, frame1, prefix="val")
         return loss
 
     def test_step(self, batch, batch_idx):
@@ -98,8 +84,8 @@ class AnimationUNet(L.LightningModule):
         input_pair = torch.cat([frame0, frame2], dim=1)
         output = self(input_pair)
         loss = self.compute_loss(output, frame1)
-        self.log('test/loss', loss, on_epoch=True)
-        self.log_eval_metrics(output, frame1, prefix='test')
+        self.log("test/loss", loss, on_epoch=True)
+        self.log_eval_metrics(output, frame1, prefix="test")
         return loss
 
     def configure_optimizers(self):

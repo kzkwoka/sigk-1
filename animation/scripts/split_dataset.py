@@ -2,13 +2,16 @@ import shutil
 import random
 from pathlib import Path
 
+
 def make_dirs(*dirs):
     for d in dirs:
         d.mkdir(parents=True, exist_ok=True)
 
+
 def move_folders(folders, target_dir):
     for folder in folders:
         shutil.move(str(folder), target_dir / folder.name)
+
 
 def split_dataset(src_dir, dest_root, train_ratio=0.8, valid_ratio=0.1, seed=42):
     train_dir = dest_root / "train"
@@ -26,10 +29,11 @@ def split_dataset(src_dir, dest_root, train_ratio=0.8, valid_ratio=0.1, seed=42)
     n_test = total - n_train - n_valid
 
     move_folders(all_folders[:n_train], train_dir)
-    move_folders(all_folders[n_train:n_train + n_valid], valid_dir)
-    move_folders(all_folders[n_train + n_valid:], test_dir)
+    move_folders(all_folders[n_train : n_train + n_valid], valid_dir)
+    move_folders(all_folders[n_train + n_valid :], test_dir)
 
     print(f"✅ Moved {n_train} folders to train/, {n_valid} to valid/, {n_test} to test/")
+
 
 if __name__ == "__main__":
     src = Path("frames_merged/frames")
