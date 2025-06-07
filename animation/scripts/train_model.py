@@ -6,8 +6,10 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 
 from src.dataset import AnimationTripletDataset
 from src.model import AnimationUNet
+import torch
 
-
+# Enable float32 matmul precision optimization for better tensor core performance
+torch.set_float32_matmul_precision('high')
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--train_dir", type=str, default="frames_merged/train", help="Path to training data")
@@ -45,6 +47,10 @@ def main(args):
     )
 
     trainer = L.Trainer(
+        accelerator="auto",  # Use GPU if available
+        devices=1,  # Use 1 GPU
+        precision=16,  # Use mixed precision
+        strategy="auto",  # Use DDP if multiple GPUs are available
         max_epochs=args.epochs, logger=wandb_logger, log_every_n_steps=10, callbacks=[checkpoint_callback]
     )
 
