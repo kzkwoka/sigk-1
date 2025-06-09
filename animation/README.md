@@ -54,6 +54,8 @@ python scripts/train_model.py \
   --run_name baseline_unet
 ```
 
+If using optical flow add `--use_flow` flag.
+
 ---
 
 ## 🧪 Test the Model
@@ -65,6 +67,8 @@ python scripts/test_model.py \
   --batch_size 16 \
   --run_name test_unet
 ```
+
+If using optical flow add `--use_flow` flag.
 
 ---
 
