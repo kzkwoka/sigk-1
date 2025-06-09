@@ -7,10 +7,11 @@ from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
 
 
 class UNet(nn.Module):
-    def __init__(self, channels=1):
+    def __init__(self, channels=1, optical_flow=True):
         super(UNet, self).__init__()
+        in_channels = 2 * channels + 2 if optical_flow else 2 * channels
         self.encoder1 = nn.Sequential(
-            nn.Conv2d(2 * channels, 16, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels, 16, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(16, 16, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
@@ -42,12 +43,14 @@ class UNet(nn.Module):
 
 
 class AnimationUNet(L.LightningModule):
-    def __init__(self, channels=3):
+    def __init__(self, channels=3, optical_flow=True):
         super(AnimationUNet, self).__init__()
-        self.model = UNet(channels=channels)
+        self.model = UNet(channels=channels, optical_flow=optical_flow)
         self.criterion = nn.L1Loss()
         self.ssim = SSIM(data_range=2.0)
         self.psnr = PSNR(data_range=2.0)
+
+        self.optical_flow = optical_flow
 
     def forward(self, x):
         return self.model(x)
@@ -63,16 +66,24 @@ class AnimationUNet(L.LightningModule):
         self.log(f"{prefix}/psnr", psnr, on_epoch=True)
 
     def training_step(self, batch, batch_idx):
-        frame0, frame1, frame2 = batch
-        input_pair = torch.cat([frame0, frame2], dim=1)
+        if self.optical_flow:
+            frame0, frame1, frame2, flow = batch
+            input_pair = torch.cat([frame0, frame2, flow], dim=1)
+        else:
+            frame0, frame1, frame2 = batch
+            input_pair = torch.cat([frame0, frame2], dim=1)
         output = self(input_pair)
         loss = self.compute_loss(output, frame1)
         self.log("train/loss", loss, on_step=True, on_epoch=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        frame0, frame1, frame2 = batch
-        input_pair = torch.cat([frame0, frame2], dim=1)
+        if self.optical_flow:
+            frame0, frame1, frame2, flow = batch
+            input_pair = torch.cat([frame0, frame2, flow], dim=1)
+        else:
+            frame0, frame1, frame2 = batch
+            input_pair = torch.cat([frame0, frame2], dim=1)
         output = self(input_pair)
         loss = self.compute_loss(output, frame1)
         self.log("val/loss", loss, on_epoch=True)
@@ -80,8 +91,12 @@ class AnimationUNet(L.LightningModule):
         return loss
 
     def test_step(self, batch, batch_idx):
-        frame0, frame1, frame2 = batch
-        input_pair = torch.cat([frame0, frame2], dim=1)
+        if self.optical_flow:
+            frame0, frame1, frame2, flow = batch
+            input_pair = torch.cat([frame0, frame2, flow], dim=1)
+        else:
+            frame0, frame1, frame2 = batch
+            input_pair = torch.cat([frame0, frame2], dim=1)
         output = self(input_pair)
         loss = self.compute_loss(output, frame1)
         self.log("test/loss", loss, on_epoch=True)
