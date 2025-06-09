@@ -11,3 +11,7 @@ tone_mapping/sihdr/resized
 rendering/dataset*
 rendering/ckpts
 rendering/neural/wandb
+
+animation/checkpoints
+animation/frames_merged
+animation/wandb
